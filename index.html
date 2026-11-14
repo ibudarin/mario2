@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Low Poly Mario</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #9dd8ed; }
+  body { font-family: monospace; touch-action: none; }
+  #game { position: absolute; inset: 0; }
+  #game canvas { display: block; }
+
+  .hud {
+    position: absolute; top: 8px; left: 8px; right: 8px;
+    display: flex; gap: 12px; align-items: flex-start;
+    color: #FFF6D9; font-size: 14px; font-weight: bold;
+    text-shadow: 1px 1px 0 #263B36; flex-wrap: wrap; pointer-events: none;
+  }
+  .hud .val { margin-left: 4px; }
+  .hud .spacer { flex: 1; }
+  .hud button {
+    pointer-events: auto; background: #263B36; color: #FFF6D9; border: 2px solid #FFF6D9;
+    font: inherit; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  }
+  #progressWrap {
+    position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+    width: min(340px, 60vw); height: 8px; background: #263B36; border-radius: 4px;
+    border: 1px solid #FFF6D9; pointer-events: none;
+  }
+  #progressBar { height: 100%; width: 0%; background: #FFF6D9; border-radius: 3px; }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: rgba(38, 59, 54, 0.55); color: #FFF6D9; text-align: center;
+    padding: 16px; box-sizing: border-box;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 { font-size: clamp(28px, 6vw, 52px); margin: 0; text-shadow: 3px 3px 0 #263B36; }
+  .overlay h2 { font-size: clamp(22px, 5vw, 40px); margin: 0; text-shadow: 3px 3px 0 #263B36; }
+  .overlay p { margin: 0; font-size: clamp(12px, 2.5vw, 16px); max-width: 560px; }
+  .overlay .btn {
+    background: #263B36; color: #FFF6D9; border: 3px solid #FFF6D9;
+    font: inherit; font-size: clamp(16px, 3vw, 22px); padding: 10px 28px;
+    border-radius: 10px; cursor: pointer;
+  }
+  .overlay .btn:hover { background: #3a5a52; }
+  .overlay .stats {
+    background: #263B36; border: 2px solid #FFF6D9; border-radius: 10px;
+    padding: 14px 22px; max-height: 46vh; overflow-y: auto;
+    font-size: clamp(13px, 2.6vw, 17px); text-align: left; min-width: min(420px, 86vw);
+  }
+  .overlay .stats div { display: flex; justify-content: space-between; gap: 24px; padding: 2px 0; }
+  .newbest { color: #ffd23e; }
+
+  #touch {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 130px;
+    display: none; justify-content: space-between; align-items: flex-end;
+    padding: 0 12px 12px; pointer-events: none; user-select: none; -webkit-user-select: none;
+  }
+  #touch .pad { display: flex; gap: 10px; pointer-events: auto; }
+  #touch button {
+    width: 58px; height: 58px; border-radius: 50%;
+    background: rgba(38, 59, 54, 0.75); color: #FFF6D9; border: 2px solid #FFF6D9;
+    font: inherit; font-size: 20px; font-weight: bold; touch-action: none;
+  }
+  #touch button:active { background: rgba(58, 90, 82, 0.9); }
+  body.touch-mode #touch { display: flex; }
+
+  #webgl-error {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    color: #FFF6D9; background: #263B36; text-align: center; padding: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div class="hud" id="hud">
+  <span>Score<span class="val" id="hud-score">0</span></span>
+  <span>Coins<span class="val" id="hud-coins">0</span></span>
+  <span>World<span class="val">1-1</span></span>
+  <span>Time<span class="val" id="hud-time">300</span></span>
+  <span>Lives<span class="val" id="hud-lives">3</span></span>
+  <span>Power<span class="val" id="hud-power">Small</span></span>
+  <span>Secrets<span class="val" id="hud-secrets">0 / 3</span></span>
+  <span class="spacer"></span>
+  <button id="btn-pause" title="Pause (P)">Pause</button>
+  <button id="btn-mute" title="Mute (M)">Sound: On</button>
+</div>
+<div id="progressWrap"><div id="progressBar"></div></div>
+
+<div class="overlay" id="overlay">
+  <h1 id="ov-title">Low Poly Mario</h1>
+  <h2 id="ov-heading" style="display:none"></h2>
+  <p id="ov-text">Arrows / A D move &middot; Space jump (hold for higher) &middot; Shift run &middot; Down enter pipes<br>
+  Stomp enemies &middot; Find 3 secrets &middot; Reach the flag!</p>
+  <div class="stats" id="ov-stats" style="display:none"></div>
+  <button class="btn" id="ov-btn">Play</button>
+  <p style="font-size:12px;opacity:0.8">P pause &middot; R restart &middot; Enter start</p>
+</div>
+
+<div id="touch">
+  <div class="pad">
+    <button id="t-left">&#9664;</button>
+    <button id="t-right">&#9654;</button>
+    <button id="t-down">&#9660;</button>
+  </div>
+  <div class="pad">
+    <button id="t-run">B</button>
+    <button id="t-jump">A</button>
+  </div>
+</div>
+
+<div id="webgl-error">WebGL is not available in this browser, so the 3D view cannot start.</div>
+
+<script src="js/vendor/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/level.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
