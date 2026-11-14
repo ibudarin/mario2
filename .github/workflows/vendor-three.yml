@@ -1,0 +1,26 @@
+name: Vendor Three.js
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Three.js r128
+        run: |
+          mkdir -p js/vendor
+          curl -sL --fail -o js/vendor/three.min.js https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+          test -s js/vendor/three.min.js
+      - name: Commit vendored library
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/vendor/three.min.js
+          git diff --cached --quiet || (git commit -m "Vendor Three.js r128 locally" && git push)
